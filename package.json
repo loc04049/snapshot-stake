@@ -1,0 +1,22 @@
+{
+  "name": "snapshot-stake",
+  "version": "1.0.0",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "nodemon server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "description": "",
+  "dependencies": {
+    "bigdecimal": "^0.6.1",
+    "bignumber.js": "^9.1.2",
+    "express": "^4.21.1",
+    "http": "^0.0.1-security",
+    "lodash": "^4.17.21",
+    "os": "^0.1.2",
+    "path": "^0.12.7",
+    "web3": "1.6.1",
+    "xlsx": "^0.18.5"
+  }
+}
