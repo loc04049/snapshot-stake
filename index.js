@@ -1,15 +1,27 @@
 import Web3 from 'web3';
 import stakeAbi from './stakeAbi.js';
-import { dataChain, exportExcel, getInfoNftStake, getPastLogs } from './function.js';
+import {
+  convertAprAmount,
+  convertTimestamp,
+  convertWeiToBalance,
+  dataChain,
+  exportExcel,
+  getInfoNftStake,
+  getPastLogs,
+  getPastLogsUnStake,
+  infoPackage,
+  sleep,
+} from './function.js';
+import BigNumber from 'bignumber.js';
+import get from 'lodash/get.js';
 
 export const getDataStaked = async (chain = 'viction') => {
-  const data = dataChain[chain] || dataChain.viction
+  const data = dataChain[chain] || dataChain.viction;
   const web3 = new Web3(data.rpc);
-  const contract = new web3.eth.Contract(stakeAbi, data.addressContract)
+  const contract = new web3.eth.Contract(stakeAbi, data.addressContract);
 
   try {
-
-    const logs = await getPastLogs(data, web3)
+    const logs = await getPastLogs(data, web3);
     const tokenHolders = {};
 
     logs.forEach((log) => {
@@ -19,12 +31,80 @@ export const getDataStaked = async (chain = 'viction') => {
       tokenHolders[tokenId] = to;
     });
 
-    const dataStaked = await getInfoNftStake({contract, arrNFT: tokenHolders })
+    const dataStaked = await getInfoNftStake({
+      contract,
+      arrNFT: tokenHolders,
+    });
 
-    exportExcel(dataStaked, chain)
-
+    exportExcel(dataStaked, chain);
   } catch (error) {
     console.error('Error fetching logs:', error);
   }
 };
 
+export const getDataUnStake = async (chain = 'viction') => {
+  const data = dataChain[chain] || dataChain.viction;
+  const web3 = new Web3(data.rpc);
+  const contract = new web3.eth.Contract(stakeAbi, data.addressContract);
+
+  try {
+    const infoPackages = await infoPackage(contract);
+    if (chain === 'bsc') {
+      await sleep(200);
+    }
+
+    const arrInfo = [];
+
+    const logs = await getPastLogsUnStake(data, web3);
+
+    for (const log of logs) {
+      const nftId = web3.utils.hexToNumberString(log.data.slice(0, 66));
+      const hash = log?.transactionHash;
+      const infoHash = await web3.eth.getTransaction(hash);
+      if (chain === 'bsc') {
+        await sleep(200);
+      }
+      const addressFrom = infoHash.from;
+      const dataInfoStake = await contract.methods.getStakedInfo(nftId).call();
+      const infoPackageID = infoPackages[dataInfoStake.packageID];
+
+      const timeStaked = new BigNumber(dataInfoStake.rate).minus(
+        new BigNumber(dataInfoStake.time)
+      );
+
+      const isClaimFullRate = timeStaked.isGreaterThanOrEqualTo(
+        infoPackageID.time
+      );
+
+      const earnStaked = new BigNumber(dataInfoStake.claim_pending_time).minus(
+        new BigNumber(dataInfoStake.amount)
+      );
+
+      const amountFullRate = convertAprAmount({
+        apr: new BigNumber(infoPackageID.rate).div(100),
+        amountStaked: dataInfoStake.amount,
+        timeStaked: timeStaked,
+      });
+
+      arrInfo.push({
+        nftId,
+        hashUnStake: hash,
+        isClaimFullRate,
+        timeStake: convertTimestamp(dataInfoStake.time),
+        timeUnStake: convertTimestamp(dataInfoStake.rate), // err contract rate = time claimed
+        rate: new BigNumber(infoPackageID.rate).div(100) + '%',
+        amountStake: convertWeiToBalance(dataInfoStake.amount),
+        earnStaked: convertWeiToBalance(earnStaked),
+        totalClaimed: convertWeiToBalance(dataInfoStake.claim_pending_time), // err contract claim_pending_time = total claim
+        addressOwner: addressFrom,
+        amountSetVault: isClaimFullRate
+          ? 0
+          : convertWeiToBalance(amountFullRate.minus(earnStaked)),
+      });
+    }
+
+    exportExcel(arrInfo, chain);
+  } catch (error) {
+    console.error('Error fetching logs:', error);
+  }
+};
