@@ -8,12 +8,10 @@ import {
   exportExcel,
   getInfoNftStake,
   getPastLogs,
-  getPastLogsUnStake,
   infoPackage,
   sleep,
 } from './function.js';
 import BigNumber from 'bignumber.js';
-import get from 'lodash/get.js';
 
 export const getDataStaked = async (chain = 'viction') => {
   const data = dataChain[chain] || dataChain.viction;
@@ -21,7 +19,13 @@ export const getDataStaked = async (chain = 'viction') => {
   const contract = new web3.eth.Contract(stakeAbi, data.addressContract);
 
   try {
-    const logs = await getPastLogs(data, web3);
+    const logs = await getPastLogs({
+      data,
+      web3,
+      topics: [
+        '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef', // topic send nft
+      ],
+    });
     const tokenHolders = {};
 
     logs.forEach((log) => {
@@ -32,11 +36,12 @@ export const getDataStaked = async (chain = 'viction') => {
     });
 
     const dataStaked = await getInfoNftStake({
+      chain,
       contract,
       arrNFT: tokenHolders,
     });
 
-    exportExcel(dataStaked, chain);
+    exportExcel({ dataArr: dataStaked, chain, name: 'staking' });
   } catch (error) {
     console.error('Error fetching logs:', error);
   }
@@ -55,7 +60,13 @@ export const getDataUnStake = async (chain = 'viction') => {
 
     const arrInfo = [];
 
-    const logs = await getPastLogsUnStake(data, web3);
+    const logs = await getPastLogs({
+      data,
+      web3,
+      topics: [
+        '0x823fc0206464443571f97eb923196ee730df989f889f9542dff3a1741d55b653', // topic unstake
+      ],
+    });
 
     for (const log of logs) {
       const nftId = web3.utils.hexToNumberString(log.data.slice(0, 66));
@@ -103,7 +114,7 @@ export const getDataUnStake = async (chain = 'viction') => {
       });
     }
 
-    exportExcel(arrInfo, chain);
+    exportExcel({ dataArr: arrInfo, chain, name: 'unstake_18_12' });
   } catch (error) {
     console.error('Error fetching logs:', error);
   }

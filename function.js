@@ -7,9 +7,10 @@ import BigNumber from 'bignumber.js';
 import Web3 from 'web3';
 import moment from 'moment';
 
+export const timeEndReward = 1735574400; // 11:00 PM 30/12/2024 GMT+7
+
 export const dataChain = {
   viction: {
-    // rpc: 'https://rpc.tomochain.com',
     rpc: 'https://rpc5.viction.xyz',
     fromBlock: 72525940,
     fromBlockUnStake: 88205602, //11:05 PM 18/12/2024 GMT+7
@@ -35,16 +36,17 @@ export const dataChain = {
   },
 };
 
-export const getPastLogs = async (data, web3) => {
+export const getPastLogs = async ({ data, web3, topics }) => {
   console.log('🚀 ~ await getPastLogs');
   if (data.chain !== 'ether') {
     const logs = await web3.eth.getPastLogs({
       fromBlock: data.fromBlock,
       toBlock: data.toBlock,
       address: data.addressContract, // Contract NFT
-      topics: [
-        '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef',
-      ], // topic send nft
+      topics,
+      // topics: [
+      //   '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef',
+      // ], // topic send nft
     });
 
     return logs;
@@ -69,9 +71,7 @@ export const getPastLogs = async (data, web3) => {
       fromBlock: i,
       toBlock: toBlock,
       address: data.addressContract, // Contract NFT
-      topics: [
-        '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef',
-      ], // topic send nft
+      topics,
     });
 
     Array.prototype.push.apply(fullResponse, dataLog);
@@ -80,33 +80,46 @@ export const getPastLogs = async (data, web3) => {
   return fullResponse;
 };
 
-export const getInfoNftStake = async ({ contract, arrNFT }) => {
+export const getInfoNftStake = async ({ chain, contract, arrNFT }) => {
   console.log('🚀 ~ await get info getInfoNftStake');
 
   // uniq address
   const addressList = [...new Set(Object.values(arrNFT))];
-  console.log('🚀 ~ addressList:', addressList.length);
 
   const arrInfo = [];
 
   for (const addressHolder of addressList) {
     // const arrInfo = await Promise.all(addressList.map(async addressHolder => {
 
+    if (chain === 'bsc') {
+      await sleep(200);
+    }
     const dataLog = await contract.methods.walletOfOwner(addressHolder).call();
-    console.log('🚀 ~ arrInfo ~ addressHolder:', addressHolder);
 
     const dataStaked = dataLog
       .filter((itemLog) => itemLog.flag && !itemLog.pending_flag)
       .map((itemMap) => {
         const newEstStaked = new BigNumber(itemMap.est_staked);
         const newAmountStake = new BigNumber(itemMap.amount);
+        const timeStaked = new BigNumber(timeEndReward).minus(
+          new BigNumber(itemMap.time)
+        );
+
+        const amountEarnFullRate = convertAprAmount({
+          apr: new BigNumber(itemMap.rate).div(100),
+          amountStaked: newAmountStake,
+          timeStaked: timeStaked,
+        });
+
         return {
           id: itemMap.id,
-          est_staked: convertWeiToBalance(newEstStaked.toFixed()),
-          amount: convertWeiToBalance(newAmountStake.toFixed()),
-          address: addressHolder,
-          totalAmount: convertWeiToBalance(
-            newAmountStake.plus(newEstStaked).toFixed()
+          rate: new BigNumber(itemMap.rate).div(100) + '%',
+          amountStaked: convertWeiToBalance(newAmountStake.toFixed()),
+          amount_earn_contract: convertWeiToBalance(newEstStaked.toFixed()),
+          amount_earn_full_rate: convertWeiToBalance(amountEarnFullRate),
+          addressHolder,
+          totalAmountSetVault: convertWeiToBalance(
+            newAmountStake.plus(amountEarnFullRate).toFixed()
           ),
         };
       });
@@ -116,7 +129,7 @@ export const getInfoNftStake = async ({ contract, arrNFT }) => {
   return flattenDeep(arrInfo);
 };
 
-export const exportExcel = (dataArr, chain) => {
+export const exportExcel = ({ dataArr, chain, name = 'stake' }) => {
   console.log('🚀 ~ exportExcel ~ dataArr:', dataArr.length);
 
   const workbook = XLSX.utils.book_new();
@@ -124,7 +137,7 @@ export const exportExcel = (dataArr, chain) => {
   XLSX.utils.book_append_sheet(workbook, worksheet, 'Sheet1');
 
   const desktopPath = path.join(os.homedir(), 'Desktop');
-  const filePath = path.join(desktopPath, `output_${chain}.xlsx`);
+  const filePath = path.join(desktopPath, `export_${name}_${chain}.xlsx`);
 
   XLSX.writeFile(workbook, filePath);
 };
@@ -149,47 +162,6 @@ export const convertWeiToBalance = (strValue, iDecimal = 18) => {
 
 export const sleep = (ms) => {
   return new Promise((resolve) => setTimeout(resolve, ms));
-};
-
-export const getPastLogsUnStake = async (data, web3) => {
-  console.log('🚀 ~ await getPastLogs');
-  if (data.chain !== 'ether') {
-    const logs = await web3.eth.getPastLogs({
-      fromBlock: data.fromBlockUnStake,
-      toBlock: data.toBlock,
-      address: data.addressContract, // Contract NFT
-      topics: [
-        '0x823fc0206464443571f97eb923196ee730df989f889f9542dff3a1741d55b653',
-      ], // topic unstake
-    });
-
-    return logs;
-  }
-  // ether
-
-  let fullResponse = [];
-
-  const latestBlockNumber = await web3.eth
-    .getBlock('latest')
-    .then((item) => item.number)
-    .catch(0);
-
-  for (let i = data.fromBlockUnStake; i < latestBlockNumber; i += 50000) {
-    const toBlock = i + 50000 >= latestBlockNumber ? 'latest' : i + 50000;
-
-    const dataLog = await web3.eth.getPastLogs({
-      fromBlock: i,
-      toBlock: toBlock,
-      address: data.addressContract, // Contract NFT
-      topics: [
-        '0x823fc0206464443571f97eb923196ee730df989f889f9542dff3a1741d55b653',
-      ], // topic unstake
-    });
-
-    Array.prototype.push.apply(fullResponse, dataLog);
-  }
-
-  return fullResponse;
 };
 
 export const infoPackage = async (contract) => {
