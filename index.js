@@ -10,6 +10,7 @@ import {
   getPastLogs,
   infoPackage,
   sleep,
+  typeExportSnap,
 } from './function.js';
 import BigNumber from 'bignumber.js';
 
@@ -25,6 +26,7 @@ export const getDataStaked = async (chain = 'viction') => {
       topics: [
         '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef', // topic send nft
       ],
+      name: typeExportSnap.staked,
     });
     const tokenHolders = {};
 
@@ -41,7 +43,7 @@ export const getDataStaked = async (chain = 'viction') => {
       arrNFT: tokenHolders,
     });
 
-    exportExcel({ dataArr: dataStaked, chain, name: 'staking' });
+    exportExcel({ dataArr: dataStaked, chain, name: 'staking_360' });
   } catch (error) {
     console.error('Error fetching logs:', error);
   }
@@ -66,6 +68,7 @@ export const getDataUnStake = async (chain = 'viction') => {
       topics: [
         '0x823fc0206464443571f97eb923196ee730df989f889f9542dff3a1741d55b653', // topic unstake
       ],
+      name: typeExportSnap.unStake,
     });
 
     for (const log of logs) {
@@ -114,7 +117,7 @@ export const getDataUnStake = async (chain = 'viction') => {
       });
     }
 
-    exportExcel({ dataArr: arrInfo, chain, name: 'unstake_18_12' });
+    exportExcel({ dataArr: arrInfo, chain, name: 'unstake_18_12_360' });
   } catch (error) {
     console.error('Error fetching logs:', error);
   }

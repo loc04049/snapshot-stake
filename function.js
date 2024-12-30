@@ -9,39 +9,61 @@ import moment from 'moment';
 
 export const timeEndReward = 1735574400; // 11:00 PM 30/12/2024 GMT+7
 
+export const typeExportSnap = {
+  staked: 'Staked',
+  unStake: 'UnStake',
+};
+
 export const dataChain = {
   viction: {
     rpc: 'https://rpc5.viction.xyz',
-    fromBlock: 72525940,
-    fromBlockUnStake: 88205602, //11:05 PM 18/12/2024 GMT+7
-    toBlock: 'latest',
     addressContract: '0xb1B7c19c9C919346390a1E40aaBCED8A66b53C06',
     chain: 'viction',
+
+    fromBlockStaked: 72525940,
+    toBlockStaked: 'latest',
+
+    fromBlockUnStake: 88205602, //11:05 PM 18/12/2024 GMT+7
+    toBlockUnStake: 88648366,
   },
   bsc: {
     rpc: 'https://bscrpc.com',
-    fromBlock: 13457759,
-    fromBlockUnStake: 44985630,
-    toBlock: 'latest',
     addressContract: '0x08ac9c38ce078b9b81e5ab5bf8aafc3d2db94385',
     chain: 'bsc',
+
+    fromBlockStaked: 13457759,
+    toBlockStaked: 'latest',
+
+    fromBlockUnStake: 44985630,
+    toBlockUnStake: 'latest',
   },
   ether: {
     rpc: 'https://ethereum.publicnode.com',
-    fromBlock: 13803141,
-    fromBlockUnStake: 21430492,
-    toBlock: 'latest',
     addressContract: '0x836bf46520C373Fdc4dc7E5A3bAe735d13bD44e3',
     chain: 'ether',
+
+    fromBlockStaked: 13803141,
+    toBlockStaked: 'latest',
+
+    fromBlockUnStake: 21430492,
+    toBlockUnStake: 'latest',
   },
 };
 
-export const getPastLogs = async ({ data, web3, topics }) => {
-  console.log('🚀 ~ await getPastLogs');
+export const getPastLogs = async ({
+  data,
+  web3,
+  topics,
+  name = typeExportSnap.staked,
+}) => {
+  const fromBlock = data[`fromBlock${name}`];
+  const toBlock = data[`toBlock${name}`];
+
+  console.log('🚀 ~ await getPastLogs' + name);
   if (data.chain !== 'ether') {
     const logs = await web3.eth.getPastLogs({
-      fromBlock: data.fromBlock,
-      toBlock: data.toBlock,
+      fromBlock,
+      toBlock,
       address: data.addressContract, // Contract NFT
       topics,
       // topics: [
@@ -56,20 +78,20 @@ export const getPastLogs = async ({ data, web3, topics }) => {
   let fullResponse = [];
 
   const latestBlockNumber =
-    data.toBlock !== 'latest'
-      ? data.toBlock
+    toBlock !== 'latest'
+      ? toBlock
       : await web3.eth
           .getBlock('latest')
           .then((item) => item.number)
           .catch(0);
 
-  for (let i = data.fromBlock; i < latestBlockNumber; i += 50000) {
-    const toBlock =
+  for (let i = fromBlock; i < latestBlockNumber; i += 50000) {
+    const newToBlock =
       i + 50000 >= latestBlockNumber ? latestBlockNumber : i + 50000;
 
     const dataLog = await web3.eth.getPastLogs({
       fromBlock: i,
-      toBlock: toBlock,
+      toBlock: newToBlock,
       address: data.addressContract, // Contract NFT
       topics,
     });
@@ -189,7 +211,7 @@ export const infoPackage = async (contract) => {
 };
 
 export const convertAprAmount = ({ apr, amountStaked, timeStaked }) => {
-  const secondOneYear = new BigNumber(31536000);
+  const secondOneYear = new BigNumber(31104000); // 360 ngày
 
   const bigNumberAPR = new BigNumber(apr);
   const bigNumberAmountStaked = new BigNumber(amountStaked);
@@ -212,7 +234,7 @@ export const findBlockByTimestamp = async (
   const data = dataChain[chain] || dataChain.viction;
   const web3 = new Web3(data.rpc);
   // let currentBlock = await web3.eth.getBlockNumber();
-  let currentBlock = 88205651;
+  let currentBlock = 88659880;
 
   while (currentBlock > 0) {
     const block = await web3.eth.getBlock(currentBlock);
